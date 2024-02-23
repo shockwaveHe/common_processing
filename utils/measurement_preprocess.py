@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import yaml
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
+import copy 
 
 class CameraPropertiesLoader:
     def __init__(self, calibration_file):
@@ -163,6 +164,31 @@ class LidarToImgProjection(object):
         depth_img[depth_img > self.max_depth] = 0
         return depth_img
 
+    def unproject(self, depth_img, extrinsic=np.eye(4), depth_scale=1.0, depth_trunc=1000.0, stride=1):
+        """
+        Unproject the depth image to the point cloud at camera frame
+        @param depth_img: depth image
+        """
+        depth_img = depth_img.astype(np.float32)
+
+        print("depth_img shape: ", depth_img.shape)
+        print("depth_img dtype: ", depth_img.dtype)
+
+        o3d_image = o3d.geometry.Image(np.random.rand(640,480).astype(np.float32))
+
+        o3d_image = o3d.geometry.Image(depth_img)
+        pcl = o3d.geometry.PointCloud.create_from_depth_image(
+            o3d_image,
+            self.cam.intrinsic,
+            extrinsic,
+            depth_scale=depth_scale,
+            depth_trunc=depth_trunc,
+            stride=stride
+        )
+        
+        return pcl
+
+
 def depth_overlay(img_raw, depth_img):
     img = cv2.addWeighted(depth_img, 0.8, img_raw, 0.2, 0)
     return img
@@ -186,3 +212,80 @@ def process_thermal_image(img_16, type="minmax"):
     else:
         img_out = img_16 / 255
     return img_out.astype(np.uint8)
+
+def draw_registration_result(source, target, transformation):
+    source_temp = copy.deepcopy(source)
+    target_temp = copy.deepcopy(target)
+    source_temp.paint_uniform_color([1, 0, 0.8])
+    target_temp.paint_uniform_color([0, 0.651, 0.929])
+    source_temp.transform(transformation)
+
+    o3d.visualization.draw_geometries([source_temp, target_temp],
+                                      zoom=0.4459,
+                                      front=[0.9288, -0.2951, -0.2242],
+                                      lookat=[1.6784, 2.0612, 1.4451],
+                                      up=[-0.3402, -0.9189, -0.1996])
+    
+def stitch_lidar_scan(pcl_files, output_file, origin_index=0, p2p_max_dist=3, icp_max_iter=2000, icp_rmse=1e-9, visualize=True):
+    """
+    Stitch multiple lidar scans into one point cloud. Assuming that the lidar scans are continuous.
+    @param pcl_files: list of point cloud files 
+    @param output_file: output file name
+    @param origin_index: index of the point cloud frame considered as the base frame
+    """
+    registrated_pcl = o3d.geometry.PointCloud()
+
+    # registrated_pcl += pcl
+    pcl_origin = o3d.io.read_point_cloud(pcl_files[origin_index])
+
+    initial_transformation = np.eye(4)
+
+    last_transformation = initial_transformation
+
+    last_pcl = copy.deepcopy(pcl_origin)
+    # start from origin_index, inter to the left and right
+    for i in range(origin_index-1, -1, -1):
+        pcl_ = o3d.io.read_point_cloud(pcl_files[i])
+        reg_p2p = o3d.pipelines.registration.registration_icp(
+            pcl_, last_pcl, p2p_max_dist, initial_transformation, o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_max_iter, relative_rmse=icp_rmse)
+        )
+        if visualize:
+            print(reg_p2p)
+            print(f"Transformation is: \n{reg_p2p.transformation}")
+        transform = reg_p2p.transformation @ last_transformation
+
+        last_transformation = transform
+        last_pcl = pcl_
+        transformed_pcl = copy.deepcopy(pcl_).transform(transform)
+
+        # draw_registration_result(transformed_pcl, pcl_origin, np.eye(4))
+        registrated_pcl += transformed_pcl
+    
+    last_pcl = copy.deepcopy(pcl_origin)
+    last_transformation = initial_transformation
+
+    for i in range(origin_index+1, len(pcl_files)):
+        pcl_ = o3d.io.read_point_cloud(pcl_files[i])
+        reg_p2p = o3d.pipelines.registration.registration_icp(
+            pcl_, last_pcl, p2p_max_dist, initial_transformation, o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=icp_max_iter, relative_rmse=icp_rmse)
+        )
+        if visualize:
+            print(reg_p2p)
+            print(f"Transformation is: \n{reg_p2p.transformation}")
+
+        transform = reg_p2p.transformation @ last_transformation
+        last_transformation = transform
+        last_pcl = pcl_
+        transformed_pcl = copy.deepcopy(pcl_).transform(transform)
+
+        # draw_registration_result(transformed_pcl, pcl_origin, np.eye(4))
+        registrated_pcl += transformed_pcl
+
+    if visualize:
+        draw_registration_result(registrated_pcl, pcl_origin, np.eye(4))
+    registrated_pcl += pcl_origin
+    if visualize:    
+        draw_registration_result(registrated_pcl, pcl_origin, np.eye(4))
+    o3d.io.write_point_cloud(output_file, registrated_pcl)

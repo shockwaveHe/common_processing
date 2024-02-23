@@ -127,10 +127,8 @@ def sync_message(src_folder, target_folder, window_size=20, tolerance=250, time_
     
     """
     Syncs the source message to the target message.
-    @param src_stamps: list of source timestamps
-    @param src_folders: list of source folders
-    @param target_stamp: target timestamp
-    @param target_folder: target folder
+    @param src_folders: list of source folders (with timestamps as the file names)
+    @param target_folder: target folder (with timestamps as the file names)
     @param window_size: search for the next closest candidate within the window size after previous closest index
     @param tolerance: tolerance in milliseconds
     @param time_shift: time offset between the source and target messages (target_stamp = src_stamp + time_shift)
@@ -172,6 +170,61 @@ def sync_message(src_folder, target_folder, window_size=20, tolerance=250, time_
                 if np.abs((float(src_stamp) * 1e-6 + time_shift) - float(target_timestamps[closest_idx]) * 1e-6) < tolerance:
                     sync_pairs.append((src_msg, target_msgs[closest_idx]))
                 else:
+                    print(f"No target message found within tolerance for {src_msg}")
+            pbar.update(1) 
+    return sync_pairs
+
+def sync_message(src_folder, target_folder, src_timestamps, target_timestamps, window_size=20, tolerance=250, time_shift=0):
+    
+    """
+    Syncs the source message to the target message.
+    @param src_stamps: list of source timestamps
+    @param src_folders: list of source folders (formated into 00001, 00002, etc.)
+    @param target_stamps: target timestamp
+    @param target_folder: target folder (formated into 00001, 00002, etc.)
+    @param window_size: search for the next closest candidate within the window size after previous closest index
+    @param tolerance: tolerance in milliseconds
+    @param time_shift: time offset between the source and target messages (target_stamp = src_stamp + time_shift)
+    return: A synced list with the source messages synced to the target messages
+    """
+    global root_dir
+
+    target_folder = os.path.join(root_dir, target_folder)
+
+    src_folder = sorted(os.listdir(os.path.join(root_dir, src_folder)))
+    
+    target_msgs = sorted(list(os.listdir(target_folder)))
+
+    print(f"Found {len(src_folder)} src messages")
+
+    print(f"Found {len(target_msgs)} target messages")
+
+    assert(len(src_timestamps) == len(src_folder))
+    assert(len(target_timestamps) == len(target_msgs))
+
+    print(f"Syncing source messages to target messages")
+
+    sync_pairs = []
+
+    closest_idx = 0
+
+    # read timestamp
+    with tqdm(total=len(src_folder), desc="Synchronizing data") as pbar:
+        for src_msg, src_stamp in zip(src_folder, src_timestamps):
+            # find the closest target timestamp within the window
+            closest_idx = np.argmin(
+                np.abs(target_timestamps[max(0, closest_idx - window_size) : 
+                                            min(closest_idx + window_size, len(target_msgs))] - src_stamp))
+            if (np.abs((float(src_stamp) * 1e-6 + time_shift) - float(target_timestamps[closest_idx]) * 1e-6) < tolerance):
+                sync_pairs.append((src_msg, target_msgs[closest_idx]))
+            else:
+                closest_idx = np.argmin(np.abs(target_timestamps - src_stamp))
+                closest_target_stamp = target_timestamps[closest_idx]
+                # check if the closest timestamp is within the tolerance
+                if np.abs((float(src_stamp) * 1e-6 + time_shift) - float(target_timestamps[closest_idx]) * 1e-6) < tolerance:
+                    sync_pairs.append((src_msg, target_msgs[closest_idx]))
+                else:
+                    continue
                     print(f"No target message found within tolerance for {src_msg}")
             pbar.update(1) 
     return sync_pairs
