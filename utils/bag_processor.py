@@ -42,7 +42,7 @@ def create_metadata(bag_name, topic_name, raw=True):
 
 def pcl2ply(pcl_msg, name):
     """
-    Convert a pcl message to a pcd file.
+    Convert a pcl message to a ply file.
     """
     cloud = o3d.geometry.PointCloud()
     points_list = list(pc2.read_points(pcl_msg, field_names=("x", "y", "z"), skip_nans=True))
@@ -224,7 +224,7 @@ def sync_message(src_folder, target_folder, src_timestamps, target_timestamps, w
                 if np.abs((float(src_stamp) * 1e-6 + time_shift) - float(target_timestamps[closest_idx]) * 1e-6) < tolerance:
                     sync_pairs.append((src_msg, target_msgs[closest_idx]))
                 else:
-                    continue
+                    # continue
                     print(f"No target message found within tolerance for {src_msg}")
             pbar.update(1) 
     return sync_pairs

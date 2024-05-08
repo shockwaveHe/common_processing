@@ -5,10 +5,16 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    root_dir = "/media/airlab3090ti/Extreme Pro3/wildfire/2024-01-26-Hawkins/run1_handheld_tree/"
+    # root_dir = "/media/airlab3090ti/Extreme Pro3/wildfire/2024-01-26-Hawkins/run1_handheld_tree/"
 
-    timestamp = 1679940089541803258 # in ns
-    depth_from_SLAM = os.path.join(root_dir, "devansh/depth_filtered/09818.png") # in camera, project to lidar frame
+    # timestamp = 1679940089541803258 # in ns
+    # depth_from_SLAM = os.path.join(root_dir, "devansh/depth_filtered/09818.png") # in camera, project to lidar frame
+    # depth_from_lidar = os.path.join(root_dir, "velodyne_points2thermal_left/single_registrated/03406.ply") # in lidar frame
+    # thermal_img_path = os.path.join(root_dir, "velodyne_points2thermal_left/target/03406.png") # in camera frame
+
+    root_dir = "/media/airlab3090ti/Extreme Pro3/wildfire/2024-01-26-Hawkins/hawkins_run1_tree"
+
+    depth_from_SLAM = os.path.join(root_dir, "depth_filtered/09809.png") # in camera, project to lidar frame
     depth_from_lidar = os.path.join(root_dir, "velodyne_points2thermal_left/single_registrated/03406.ply") # in lidar frame
     thermal_img_path = os.path.join(root_dir, "velodyne_points2thermal_left/target/03406.png") # in camera frame
     # extrinsic parameters

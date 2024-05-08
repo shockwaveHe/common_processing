@@ -36,8 +36,15 @@ if __name__ == "__main__":
     with open(src_timestamps_file, "r") as file:
         src_t = [int(line.strip()) for line in file]
     src_t = np.array(src_t)
-    
+
+    print((target_t[0] - src_t[1895]) * 1e-9)
+    print((target_t[-1] - src_t[6929]) * 1e-9)
     src_folder = os.path.join(src_folder, 'src')
     target_folder = os.path.join(target_folder, 'depth_filtered')
 
+
     sync_pairs = bag_processor.sync_message(src_folder, target_folder, src_t, target_t, window_size=20, tolerance=250, time_shift=0)
+
+    print("found {} pairs".format(len(sync_pairs)))
+
+    # bag_processor.generate_sync_folder()
